@@ -1,0 +1,300 @@
+* TODO Replace all instances of APP_NAME in this text with the application name
+* Prerequistes
+** Create directory structure
+Python code will live in the main project directory (the directory this file is
+on).  HTML templates will reside in a "templates" subdirectory while static
+assets (css, javascript) do so in the "static" subdirectory; this "static"
+subdirectory, has a "node_modules" subdirectory where the 3rd party javascript
+libraries and css frameworks are installed through npm.
+
+#+BEGIN_SRC sh :session python1
+mkdir templates
+mkdir static
+#+END_SRC
+
+** Setting up a python virtualenv and installing libraries
+As is commonplace, we create a virtual environment exclusive for this project
+(python's virtualenv and virtualenvwrapper must be already installed in the
+"main" or "default" python) and install the 3rd party libraries used throughout
+the project with pip.
+
+#+BEGIN_SRC sh :session python1
+mkvirtualenv APP_NAME
+workon APP_NAME
+pip install ipython Flask psycopg2 flask-sqlalchemy flask-login flask-migrate
+#+END_SRC
+
+** Installing libraries through npm
+We'll manage our 3rd party javascript packages and css frameworks through npm,
+the package closure-angular is also made by us.
+
+#+BEGIN_SRC sh :session python1
+cd static
+npm init -f                      # -f to not ask anything, defaults accepted
+npm install -S angular \
+    angular-route \
+    angular-resource \
+    angular-animate \
+    jquery \
+    underscore \
+    socketio \
+    bootstrap-sass \
+    pabloclosure/closure-angular  # Own library
+#+END_SRC
+
+* Flask
+#+BEGIN_SRC python :tangle APP_NAME.py
+<<APP_NAME:imports>>
+<<APP_NAME:initialization>>
+<<APP_NAME:models>>
+<<APP_NAME:authentication>>
+<<APP_NAME:routes>>
+<<APP_NAME:dbsetup>>
+<<APP_NAME:server-start>>
+#+END_SRC
+
+** Imports
+#+BEGIN_SRC python :noweb-ref APP_NAME:imports
+from flask import (
+    Flask,
+    request,
+    json,
+    render_template,
+    redirect
+)
+
+from flask.ext.sqlalchemy import SQLAlchemy
+
+from flask.ext.script import Manager
+
+from flask.ext.migrate import (
+    Migrate,
+    MigrateCommand
+)
+
+from flask.ext.login import (
+    LoginManager,
+    UserMixin,
+    login_user,
+    logout_user
+)
+#+END_SRC
+
+** Initialization
+#+BEGIN_SRC python :noweb-ref APP_NAME:initialization
+app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgres://localhost:5432/APP_NAME'
+app.config['SECRET_KEY'] = 'dghlskh3o81g9sg8fa'
+
+db = SQLAlchemy(app)
+migrate = Migrate(app, db)
+
+manager = Manager(app)
+manager.add_command('db', MigrateCommand)
+#+END_SRC
+
+** Models
+
+*** class User
+Represents a registered user, it extends Flask-SQLAlchemy's Model class and
+Flask-Login's UserMixin class that defines some methods that the library
+requires.
+
+#+BEGIN_SRC python :noweb-ref APP_NAME:models
+class User(db.Model, UserMixin):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String, unique=True)
+    password = db.Column(db.String)
+#+END_SRC
+
+**** User.__init__()
+#+BEGIN_SRC python :noweb-ref APP_NAME:models
+    def __init__(self, email, password):
+        self.email = email
+        self.password = password
+#+END_SRC
+
+**** User.__repr__()
+#+BEGIN_SRC python :noweb-ref APP_NAME:models
+    def __repr__(self):
+        return '<User: %r>' % self.email
+#+END_SRC
+
+** Authentication
+We make use of the Flask-Login 3rd party library to handle user authentication,
+the first thing the library requires us to do is to make an instance of the
+LoginManager class and enable it in our app through the init_app method.
+
+#+BEGIN_SRC python :noweb-ref APP_NAME:authentication
+login_manager = LoginManager()
+login_manager.init_app(app)
+#+END_SRC
+
+We need to provide a user_loader callback, that will be used to reload the user
+object from a unicode id.
+
+#+BEGIN_SRC python :noweb-ref APP_NAME:authentication
+@login_manager.user_loader
+def user_loader(userid):
+    '''[ if userid is the primary key of a user in the database ->
+           returns the coressponding User instance
+         else ->
+           returns None ]
+    '''
+    return User.query.get(userid)
+#+END_SRC
+
+We'll have two routes, one for login and one for logout. Since our angular
+application handles the templates the routes do not return any, they simply
+redirect the user on success.
+
+*** Login route
+#+BEGIN_SRC python :noweb-ref APP_NAME:authentication
+@app.route('/auth-login', methods=['POST'])
+def login():
+    ''' [ If the provided user credentials are valid ->
+            logs in the user and redirects him/her to the index page
+          else ->
+            returns information about what went wrong ]'''
+
+    user = None
+    email = request.form.get('email')
+    password = request.form.get('password')
+
+    user = User.query.filter(
+        User.email == email,
+        User.password == password
+    ).first()
+
+    if user is not None:
+        login_user(user)
+        return redirect('/')
+    return json.jsonify('Could not authenticate'), 400
+#+END_SRC
+
+*** Logout route
+#+BEGIN_SRC python :noweb-ref APP_NAME:authentication
+@app.route('/auth-logout')
+def logout():
+    '''Logs out the user and redirects to the index page.'''
+    logout_user()
+    return redirect('/')
+#+END_SRC
+
+** Routes
+
+*** /
+#+BEGIN_SRC python :noweb-ref APP_NAME:routes
+@app.route('/')
+def index():
+    return render_template('base.html')
+#+END_SRC
+
+*** /partials/<filename>
+This route is the one angular must use to request partial templates, it takes
+one argument, the filename of the desired template.
+
+#+BEGIN_SRC python :noweb-ref APP_NAME:routes
+@app.route('/partials/<filename>')
+def partial_templates(filename):
+    return render_template(filename)
+#+END_SRC
+
+** Database Setup
+#+BEGIN_SRC python :noweb-ref APP_NAME:dbsetup
+db.create_all()
+#+END_SRC
+
+** Server Start
+#+BEGIN_SRC python :noweb-ref APP_NAME:server-start
+if __name__ == '__main__':
+    manager.run()
+#+END_SRC
+
+* Angular
+#+BEGIN_SRC js :tangle static/application.js
+var app = angular.module('APP_NAME', [
+    'ngRoute',
+    'ngResource',
+    'ngAnimate',
+    'closureAngular',
+]);
+
+<<angular:configuration>>
+
+<<angular:routes>>
+
+<<angular:filters>>
+
+<<angular:services>>
+
+<<angular:directives>>
+
+<<angular:controllers>>
+#+END_SRC
+
+** Configuration
+
+** Routes
+#+BEGIN_SRC js :noweb-ref angular:routes
+app.config(function($routeProvider) {
+    $routeProvider
+        .when('/', {
+            templateUrl: 'partials/home.html'
+        });
+});
+#+END_SRC
+
+** Filters
+
+** Services
+
+** Directives
+
+** Controllers
+* Templates
+
+** base.html
+#+BEGIN_SRC html :tangle templates/base.html
+<!doctype html>
+<html ng-app="APP_NAME">
+  <head>
+    <base href="/"/>
+    <link href="static/application.css" rel="stylesheet"/>
+  </head>
+  <body>
+    <nav class="navbar navbar-default">
+      <div class="container">
+        <ul class="nav navbar-nav" click-selects-one>
+          <li click-selectable><a class="navbar-brand" href="/">Brand</a></li>
+          <li click-selectable><a href="/#/startups">Startups</a></li>
+          <li click-selectable><a href="/#/noticias">Noticias</a></li>
+          <li click-selectable><a href="/#/slicing-pie">Slicing Pie</a></li>
+          <li click-selectable><a href="/#/founders-and-contribuitors">Fundadores y Contribuidores</a></li>
+        </ul>
+      </div>
+    </nav>
+
+    <div class="container ng-view"></div>
+
+    <script src="static/node_modules/jquery/dist/jquery.js"></script>
+    <script src="static/node_modules/underscore/underscore.js"></script>
+    <script src="static/node_modules/angular/angular.js"></script>
+    <script src="static/node_modules/angular-route/angular-route.js"></script>
+    <script src="static/node_modules/angular-resource/angular-resource.js"></script>
+    <script src="static/node_modules/angular-animate/angular-animate.js"></script>
+    <script src="static/node_modules/closure-angular/closure-angular.js"></script>
+    <script src="static/application.js"></script>
+  </body>
+</html>
+#+END_SRC
+
+** home.html
+#+BEGIN_SRC html :tangle templates/home.html
+<h1>Flask App Skeleton</h1>
+#+END_SRC
+
+* Styles
+#+BEGIN_SRC scss :tangle static/application.scss
+@import "node_modules/bootstrap-sass/assets/stylesheets/bootstrap";
+#+END_SRC

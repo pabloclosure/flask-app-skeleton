@@ -1,0 +1,31 @@
+<!doctype html>
+<html ng-app="APP_NAME">
+  <head>
+    <base href="/"/>
+    <link href="static/application.css" rel="stylesheet"/>
+  </head>
+  <body>
+    <nav class="navbar navbar-default">
+      <div class="container">
+        <ul class="nav navbar-nav" click-selects-one>
+          <li click-selectable><a class="navbar-brand" href="/">Brand</a></li>
+          <li click-selectable><a href="/#/startups">Startups</a></li>
+          <li click-selectable><a href="/#/noticias">Noticias</a></li>
+          <li click-selectable><a href="/#/slicing-pie">Slicing Pie</a></li>
+          <li click-selectable><a href="/#/founders-and-contribuitors">Fundadores y Contribuidores</a></li>
+        </ul>
+      </div>
+    </nav>
+
+    <div class="container ng-view"></div>
+
+    <script src="static/node_modules/jquery/dist/jquery.js"></script>
+    <script src="static/node_modules/underscore/underscore.js"></script>
+    <script src="static/node_modules/angular/angular.js"></script>
+    <script src="static/node_modules/angular-route/angular-route.js"></script>
+    <script src="static/node_modules/angular-resource/angular-resource.js"></script>
+    <script src="static/node_modules/angular-animate/angular-animate.js"></script>
+    <script src="static/node_modules/closure-angular/closure-angular.js"></script>
+    <script src="static/application.js"></script>
+  </body>
+</html>
